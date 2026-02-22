@@ -1,0 +1,208 @@
+{
+  "name": "Segurident – Llamada Saliente Natasha",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "segurident-llamada",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook – Solicitud de Llamada",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-800, 200],
+      "webhookId": "segurident-llamada"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json;\nconst phone = (body.phone || '').replace(/\\D/g, '');\nconst name = body.name || 'Paciente';\n\nif (!phone || phone.length !== 9) {\n  return {\n    json: {\n      valid: false,\n      error: 'Número de teléfono inválido o incompleto'\n    }\n  };\n}\n\nconst firstDigit = phone[0];\nif (!['6','7','8','9'].includes(firstDigit)) {\n  return {\n    json: {\n      valid: false,\n      error: 'Solo se aceptan números españoles (6XX, 7XX, 8XX, 9XX)'\n    }\n  };\n}\n\nreturn {\n  json: {\n    valid: true,\n    to_number: '+34' + phone,\n    name: name,\n    timestamp: body.timestamp || new Date().toISOString(),\n    source: body.source || 'web-app'\n  }\n};"
+      },
+      "id": "node-process",
+      "name": "Validar y Formatear Teléfono",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-580, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-validate-check",
+      "name": "¿Teléfono Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-360, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/v2/create-phone-call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer key_ee1a5b5a911216c3439a2d0dc31e"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"from_number\": \"{{ $vars.RETELL_FROM_NUMBER }}\",\n  \"to_number\": \"{{ $json.to_number }}\",\n  \"agent_id\": \"{{ $vars.RETELL_AGENT_ID }}\",\n  \"retell_llm_dynamic_variables\": {\n    \"customer_name\": \"{{ $json.name }}\"\n  }\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-retell",
+      "name": "Retell AI – Iniciar Llamada Natasha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-140, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.call_id }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "node-call-check",
+      "name": "¿Llamada Iniciada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [80, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Natasha te llamará en menos de 2 minutos', call_id: $json.call_id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-ok",
+      "name": "Responder – Éxito",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [300, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'No se pudo iniciar la llamada. Por favor inténtalo de nuevo.' } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "node-respond-error-retell",
+      "name": "Responder – Error Retell",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "node-respond-invalid",
+      "name": "Responder – Teléfono Inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-140, 320]
+    }
+  ],
+  "connections": {
+    "Webhook – Solicitud de Llamada": {
+      "main": [
+        [
+          {
+            "node": "Validar y Formatear Teléfono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar y Formatear Teléfono": {
+      "main": [
+        [
+          {
+            "node": "¿Teléfono Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Teléfono Válido?": {
+      "main": [
+        [
+          {
+            "node": "Retell AI – Iniciar Llamada Natasha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder – Teléfono Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retell AI – Iniciar Llamada Natasha": {
+      "main": [
+        [
+          {
+            "node": "¿Llamada Iniciada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Llamada Iniciada?": {
+      "main": [
+        [
+          {
+            "node": "Responder – Éxito",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder – Error Retell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "segurident-calldemo"
+  }
+}
