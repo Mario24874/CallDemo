@@ -58,7 +58,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={\n  \"from_number\": \"+34919935132\",\n  \"to_number\": \"{{ $json.to_number }}\",\n  \"agent_id\": \"agent_908297c3251093e944419294f6\",\n  \"retell_llm_dynamic_variables\": {\n    \"customer_name\": \"{{ $json.name }}\"\n  }\n}",
+        "jsonBody": "{\n  \"from_number\": \"+34919935132\",\n  \"to_number\": \"{{ $json.to_number }}\",\n  \"agent_id\": \"agent_908297c3251093e944419294f6\",\n  \"retell_llm_dynamic_variables\": {\n    \"customer_name\": \"{{ $json.name }}\"\n  }\n}",
         "options": {
           "timeout": 15000
         }
